@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+smbus2
+RPi.bme280
