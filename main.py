@@ -7,7 +7,7 @@ from sensor_manager import SensorManager
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
-sensor_manager = SensorManager(poll_interval=2.0, history_size=2000)
+sensor_manager = SensorManager(poll_interval=2.0, history_size=10000)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

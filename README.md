@@ -33,17 +33,26 @@ You can use the provided script to manage the server process:
 ## API Endpoints
 
 - **GET /**: Returns device status, uptime, and system info.
-- **GET /currentreadings**: Returns JSON object with sensor readings.
-  - Structure:
-    ```json
-    {
-      "timestamp": "2023-10-27T10:00:00.123456",
-      "channels": {
-        "channel_0": {
-          "0x76": { "temperature_c": 25.4, ... },
-          "0x77": { "temperature_c": 26.1, ... }
-        },
-        ...
-      }
-    }
-    ```
+- **GET /latest**: Returns the most recent sensor reading.
+- **GET /last/{num}**: Returns the last `num` readings (capped at history size, default 2000).
+
+## Monitoring Tool
+
+A client script `client_poller.py` is included to verify the sensor data and calculate simple statistics. This is useful for checking if the system is working correctly.
+
+To use it:
+
+1. Ensure all requirements are installed (including `pandas` and `requests`):
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Run the script:
+   ```bash
+   python3 client_poller.py
+   ```
+
+The script will fetch the last 1000 readings every 10 seconds and display:
+- Current live readings depending on the latest timestamp.
+- Min/Max/Mean temperature stats for each sensor over the requested window.
+

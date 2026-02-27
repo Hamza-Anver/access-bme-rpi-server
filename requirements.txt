@@ -2,3 +2,5 @@ fastapi
 uvicorn
 smbus2
 RPi.bme280
+requests
+pandas
