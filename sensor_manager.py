@@ -1,17 +1,78 @@
 import smbus2
 import bme280
 import time
+import threading
+from collections import deque
 from datetime import datetime
+import copy
 
 # Constants
 MUX_ADDR = 0x70
 BME_ADDRS = [0x76, 0x77]
 
 class SensorManager:
-    def __init__(self, bus_number=1):
+    def __init__(self, bus_number=1, history_size=2000, poll_interval=2.0):
         self.bus_number = bus_number
         self.bus = None
+        self.history_size = history_size
+        self.poll_interval = poll_interval
+        
+        self.readings = deque(maxlen=self.history_size)
+        self.lock = threading.Lock()
+        
+        self._stop_event = threading.Event()
+        self._thread = None
+        
         self._initialize_bus()
+    
+    def start_polling(self):
+        if self._thread is not None and self._thread.is_alive():
+            return
+            
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._polling_loop, daemon=True)
+        self._thread.start()
+        print("Sensor polling started.")
+
+    def stop_polling(self):
+        if self._thread is None or not self._thread.is_alive():
+            return
+            
+        self._stop_event.set()
+        self._thread.join(timeout=5.0)
+        print("Sensor polling stopped.")
+
+    def _polling_loop(self):
+        while not self._stop_event.is_set():
+            start_time = time.time()
+            data = self._fetch_sensor_data()
+            
+            with self.lock:
+                self.readings.append(data)
+            
+            # Calculate sleep time to maintain interval
+            elapsed = time.time() - start_time
+            sleep_time = max(0, self.poll_interval - elapsed)
+            
+            # Sleep in small chunks to allow quick shutdown
+            if sleep_time > 0:
+                self._stop_event.wait(sleep_time)
+
+    def get_latest_reading(self):
+        with self.lock:
+            if not self.readings:
+                return None
+            return copy.deepcopy(self.readings[-1])
+
+    def get_last_n_readings(self, n: int):
+        with self.lock:
+            if not self.readings:
+                return []
+            # deque slicing isn't direct, convert to list
+            # list(self.readings) creates a copy, then slice
+            all_readings = list(self.readings)
+            return all_readings[-n:]
+
 
     def _initialize_bus(self):
         try:
@@ -41,11 +102,12 @@ class SensorManager:
         except Exception:
             pass
 
-    def get_all_readings(self):
+    def _fetch_sensor_data(self):
+        read_start_time = time.time()
         if self.bus is None:
             self._initialize_bus()
             if self.bus is None:
-               return {"error": "I2C bus unavailable"}
+               return {"error": "I2C bus unavailable", "timestamp": datetime.now().isoformat()}
 
         # Dictionary to hold data: channel -> address -> data
         channels_data = {}
@@ -81,6 +143,7 @@ class SensorManager:
 
         return {
             "timestamp": datetime.now().isoformat(),
+            "timetaken": time.time() - read_start_time,
             "channels": channels_data
         }
 
